@@ -1,0 +1,47 @@
+ch dicom series, there is an array itk::DictionaryArrayType which contains the array composed of itk::MetaDataDictionary.
+## return the pointer to the first slice data
+ReaderType::DictionaryRawPointer inputDict = (*(reader->GetMetaDataDictionaryArray()))[0]
+## return the pointer to the dictionary array
+ReaderType::DictionaryArrayType::Pointer  inputDictArray = (*(reader->GetMetaDataDictionaryArray()))
+## Build an array
+ReaderType::DictionaryArrayType  outputArray
+## Get a tag value from the dictionary
+itk::ExposeMetaData<std::string>(*inputDict,"0020|000d",dataholder)
+## Put new tag value into dictionary
+itk::EncapsulateMetaData<std::string>(*dict,"0020|0052",valueholder)
+## push back slice dictionary to the dictionary array
+outputArray.push_back(dict)
+## get one item in a dictionary
+itk::MetaDataObjectBase::Pointer entry = (*inputDict)["0028|1052"]
+itk::MetaDataObject<std::string>::ConstPointer interceptValue = dynamic_cast<const itk::MetaDataObject<std::string> *>(entry.GetPointer());
+## write dicom series with modified dictionary array
+seriesWriter->SetImageIO(gdcmIO)  ## gdcmIO is registered to the reader
+seriesWriter->SetFileNames(object->GetFileNames)
+seriesWriter->SetMetaDataDictionaryArray(&outputArray)
+seriesWriter->Update()
+
+outputArray could be made of the dictionary array from reader with newly added stuff. The dictionary could be copied as:
+CopyDictionary(*inputDict,*dict)
+CopyDictionary(itk::MetaDataDictionary & fromDict, itk::MetaDataDictionary & toDict)
+{
+  using DictionaryType = itk::MetaDataDictionary;
+
+  DictionaryType::ConstIterator itr = fromDict.Begin();
+  DictionaryType::ConstIterator end = fromDict.End();
+  using MetaDataStringType = itk::MetaDataObject<std::string>;
+
+  while (itr != end)
+  {
+    itk::MetaDataObjectBase::Pointer entry = itr->second;
+
+    MetaDataStringType::Pointer entryvalue = dynamic_cast<MetaDataStringType *>(entry.GetPointer());
+    if (entryvalue)
+    {
+      std::string tagkey = itr->first;
+      std::string tagvalue = entryvalue->GetMetaDataObjectValue();
+      itk::EncapsulateMetaData<std::string>(toDict, tagkey, tagvalue);
+    }
+    ++itr;
+  }
+}
+
